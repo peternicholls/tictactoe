@@ -65,7 +65,7 @@ class GameScene: SKScene {
             if gameBoard.isPlayerOne(){
                 let cross = SKSpriteNode(imageNamed: "X_symbol")
                 cross.size = CGSize(width: 75, height: 75)
-                cross.zRotation = CGFloat(M_PI / 4.0)
+                cross.zRotation = CGFloat.pi / 4.0
                 node = cross
             }
             else{

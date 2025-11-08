@@ -158,7 +158,7 @@ class ActiveGameState: GKState{
             assert(scene != nil, "Scene must not be nil")
             assert(scene?.gameBoard != nil, "Gameboard must not be nil")
                 
-            DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default).async {
+            DispatchQueue.global(qos: .default).async {
                 self.scene!.ai.gameModel = self.scene!.gameBoard!
                 let move = self.scene!.ai.bestMoveForActivePlayer() as? Move
                     
@@ -169,7 +169,7 @@ class ActiveGameState: GKState{
                 let  aiTimeCeiling: TimeInterval = 1.0
                     
                 let delay = min(aiTimeCeiling - delta, aiTimeCeiling)
-                DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + Double(Int64(delay) * Int64(NSEC_PER_SEC)) / Double(NSEC_PER_SEC)) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                         
                     guard let cellNode: SKSpriteNode = self.scene?.childNode(withName: self.scene!.gameBoard!.getElementAtBoardLocation(move!.cell).node) as? SKSpriteNode else{
                             return
