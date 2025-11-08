@@ -10,6 +10,7 @@ import Foundation
 import GameplayKit
 import SpriteKit
 
+@MainActor
 class StartGameState: GKState{
     var scene: GameScene?
     var winningLabel: SKNode!
@@ -62,6 +63,7 @@ class StartGameState: GKState{
     }
 }
 
+@MainActor
 class EndGameState: GKState{
     var scene: GameScene?
     
@@ -84,6 +86,7 @@ class EndGameState: GKState{
     }
 }
 
+@MainActor
 class ActiveGameState: GKState{
     var scene: GameScene?
     var waitingOnPlayer: Bool
@@ -103,8 +106,9 @@ class ActiveGameState: GKState{
     }
     
     override func update(deltaTime seconds: TimeInterval) {
-        assert(scene != nil, "Scene must not be nil")
-        assert(scene?.gameBoard != nil, "Gameboard must not be nil")
+        guard scene != nil, scene?.gameBoard != nil else {
+            return
+        }
         
         if !waitingOnPlayer{
             waitingOnPlayer = true
@@ -113,14 +117,17 @@ class ActiveGameState: GKState{
     }
     
     func updateGameState(){
-        assert(scene != nil, "Scene must not be nil")
-        assert(scene?.gameBoard != nil, "Gameboard must not be nil")
+        guard let scene = scene, let gameBoard = scene.gameBoard else {
+            return
+        }
         
-        let (state, winner) = self.scene!.gameBoard!.determineIfWinner()
+        let (state, winner) = gameBoard.determineIfWinner()
         if state == .winner{
             let winningLabel = self.scene?.childNode(withName: "winningLabel")
             winningLabel?.isHidden = true
-            let winningPlayer = self.scene!.gameBoard!.isPlayerOne(winner!) ? "1" : "2"
+            guard let winner = winner, let winningPlayer = gameBoard.isPlayerOne(winner) ? "1" : "2" as String? else {
+                return
+            }
             if let winningLabel = winningLabel as? SKLabelNode,
                 let player1_score = self.scene?.childNode(withName: "//player1_score") as? SKLabelNode,
                 let player2_score = self.scene?.childNode(withName: "//player2_score") as? SKLabelNode{
@@ -128,10 +135,14 @@ class ActiveGameState: GKState{
                 winningLabel.isHidden = false
                 
                 if winningPlayer == "1"{
-                    player1_score.text = "\(Int(player1_score.text!)! + 1)"
+                    if let score = Int(player1_score.text ?? "0") {
+                        player1_score.text = "\(score + 1)"
+                    }
                 }
                 else{
-                    player2_score.text = "\(Int(player2_score.text!)! + 1)"
+                    if let score = Int(player2_score.text ?? "0") {
+                        player2_score.text = "\(score + 1)"
+                    }
                 }
                 
                 self.stateMachine?.enter(EndGameState.self)
@@ -151,34 +162,49 @@ class ActiveGameState: GKState{
             waitingOnPlayer = false
         }
 
-        else if self.scene!.gameBoard!.isPlayerTwoTurn(){
+        else if gameBoard.isPlayerTwoTurn(){
             //AI moves
             self.scene?.isUserInteractionEnabled = false
             
-            assert(scene != nil, "Scene must not be nil")
-            assert(scene?.gameBoard != nil, "Gameboard must not be nil")
+            guard let scene = scene, let gameBoard = scene.gameBoard else {
+                return
+            }
                 
-            DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default).async {
-                self.scene!.ai.gameModel = self.scene!.gameBoard!
-                let move = self.scene!.ai.bestMoveForActivePlayer() as? Move
-                    
-                assert(move != nil, "AI should be able to find a move")
-                    
+            Task {
+                let aiMove = await withCheckedContinuation { continuation in
+                    Task.detached {
+                        scene.ai.gameModel = gameBoard
+                        let move = scene.ai.bestMoveForActivePlayer() as? Move
+                        continuation.resume(returning: move)
+                    }
+                }
+                
+                guard let move = aiMove else {
+                    await MainActor.run {
+                        self.scene?.isUserInteractionEnabled = true
+                        self.waitingOnPlayer = false
+                    }
+                    return
+                }
+                
                 let strategistTime = CFAbsoluteTimeGetCurrent()
                 let delta = CFAbsoluteTimeGetCurrent() - strategistTime
-                let  aiTimeCeiling: TimeInterval = 1.0
-                    
+                let aiTimeCeiling: TimeInterval = 1.0
+                
                 let delay = min(aiTimeCeiling - delta, aiTimeCeiling)
-                DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + Double(Int64(delay) * Int64(NSEC_PER_SEC)) / Double(NSEC_PER_SEC)) {
-                        
-                    guard let cellNode: SKSpriteNode = self.scene?.childNode(withName: self.scene!.gameBoard!.getElementAtBoardLocation(move!.cell).node) as? SKSpriteNode else{
-                            return
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                
+                await MainActor.run {
+                    guard let cellNode = self.scene?.childNode(withName: gameBoard.getElementAtBoardLocation(move.cell)?.node ?? "") as? SKSpriteNode else {
+                        self.scene?.isUserInteractionEnabled = true
+                        self.waitingOnPlayer = false
+                        return
                     }
                     let circle = SKSpriteNode(imageNamed: "O_symbol")
                     circle.size = CGSize(width: 75, height: 75)
                     cellNode.addChild(circle)
-                    self.scene!.gameBoard!.addPlayerValueAtBoardLocation(move!.cell, value: .o)
-                    self.scene!.gameBoard!.togglePlayer()
+                    _ = gameBoard.addPlayerValueAtBoardLocation(move.cell, value: .o)
+                    gameBoard.togglePlayer()
                     self.waitingOnPlayer = false
                     self.scene?.isUserInteractionEnabled = true
                 }
