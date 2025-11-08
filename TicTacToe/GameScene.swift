@@ -65,7 +65,7 @@ class GameScene: SKScene {
             if gameBoard.isPlayerOne(){
                 let cross = SKSpriteNode(imageNamed: "X_symbol")
                 cross.size = CGSize(width: 75, height: 75)
-                cross.zRotation = CGFloat(M_PI / 4.0)
+                cross.zRotation = CGFloat.pi / 4.0
                 node = cross
             }
             else{
@@ -75,12 +75,12 @@ class GameScene: SKScene {
             }
             
             for i in 0...8{
-                guard let cellNode: SKSpriteNode = self.childNode(withName: gameBoard.getElementAtBoardLocation(i).node) as? SKSpriteNode else{
-                    return
+                guard let cellNode: SKSpriteNode = self.childNode(withName: gameBoard.getElementAtBoardLocation(i)?.node ?? "") as? SKSpriteNode else{
+                    continue
                 }
                 if selectedNode.name == cellNode.name{
                     cellNode.addChild(node)
-                    gameBoard.addPlayerValueAtBoardLocation(i, value: gameBoard.isPlayerOne() ? .x : .o)
+                    _ = gameBoard.addPlayerValueAtBoardLocation(i, value: gameBoard.isPlayerOne() ? .x : .o)
                     gameBoard.togglePlayer()
                 }
             }

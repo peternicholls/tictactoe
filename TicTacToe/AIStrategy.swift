@@ -9,25 +9,24 @@
 import GameplayKit
 import Foundation
 
-enum PlayerType: Int{
+enum PlayerType: Int, Sendable {
     case x
     case o
     case none
 }
 
-enum GameState: Int{
+enum GameState: Int, Sendable {
     case winner
     case draw
     case playing
 }
 
-struct BoardCell{
+struct BoardCell: Sendable {
     var value: PlayerType
     var node: String
 }
 
-@objc(Player)
-class Player: NSObject, GKGameModelPlayer{
+class Player: NSObject, GKGameModelPlayer, @unchecked Sendable {
     let _player: Int
     
     init(player:Int) {
@@ -40,8 +39,7 @@ class Player: NSObject, GKGameModelPlayer{
     }
 }
 
-@objc(Move)
-class Move: NSObject, GKGameModelUpdate{
+class Move: NSObject, GKGameModelUpdate, @unchecked Sendable {
     var value: Int = 0
     var cell: Int
     
@@ -51,8 +49,7 @@ class Move: NSObject, GKGameModelUpdate{
     }
 }
 
-@objc(Board)
-class Board: NSObject, NSCopying, GKGameModel{
+class Board: NSObject, NSCopying, GKGameModel, @unchecked Sendable {
     fileprivate let _players: [GKGameModelPlayer] = [Player(player: 0), Player(player: 1)]
     fileprivate var currentPlayer: GKGameModelPlayer?
     fileprivate var board: [BoardCell]
@@ -100,22 +97,27 @@ class Board: NSObject, NSCopying, GKGameModel{
         currentPlayer = _players[1]
     }
     
-    func getElementAtBoardLocation(_ index:Int)->BoardCell{
-        assert(index < board.count, "Location on board must be less than total elements in array")
+    func getElementAtBoardLocation(_ index:Int)->BoardCell?{
+        guard index < board.count else {
+            return nil
+        }
         return board[index]
     }
     
-    func addPlayerValueAtBoardLocation(_ index: Int, value: PlayerType){
-        assert(index < board.count, "Location on board must be less than total elements in array")
+    func addPlayerValueAtBoardLocation(_ index: Int, value: PlayerType) -> Bool {
+        guard index < board.count else {
+            return false
+        }
         board[index].value = value
+        return true
     }
     
-    @objc func isPlayerOne(_ player: GKGameModelPlayer)->Bool{
+    func isPlayerOne(_ player: GKGameModelPlayer)->Bool{
         return player.playerId == _players[0].playerId
     }
     
     
-    @objc func copy(with zone: NSZone?) -> Any{
+    func copy(with zone: NSZone?) -> Any{
         let copy = Board()
         copy.setGameModel(self)
         return copy
@@ -146,7 +148,7 @@ class Board: NSObject, NSCopying, GKGameModel{
         super.init()
     }
     
-    @objc var players: [GKGameModelPlayer]?{
+    var players: [GKGameModelPlayer]?{
        return self._players
     }
     
@@ -178,13 +180,17 @@ class Board: NSObject, NSCopying, GKGameModel{
     }
     
     func unapplyGameModelUpdate(_ gameModelUpdate: GKGameModelUpdate) {
-        let move = gameModelUpdate as! Move
+        guard let move = gameModelUpdate as? Move else {
+            return
+        }
         self.board[move.cell].value = .none
         self.togglePlayer()
     }
     
     func apply(_ gameModelUpdate: GKGameModelUpdate) {
-        let move = gameModelUpdate as! Move
+        guard let move = gameModelUpdate as? Move else {
+            return
+        }
         self.board[move.cell].value = isPlayerOne() ? .x : .o
         self.togglePlayer()
     
