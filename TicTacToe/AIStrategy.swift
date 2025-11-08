@@ -59,6 +59,8 @@ class Board: NSObject, NSCopying, GKGameModel{
     fileprivate var currentScoreForPlayerOne: Int
     fileprivate var currentScoreForPlayerTwo: Int
     
+    /// Checks if the current player is player one.
+    /// - Returns: True if the current player is player one
     func isPlayerOne()->Bool{
         return currentPlayer?.playerId == _players[0].playerId
     }
@@ -75,10 +77,17 @@ class Board: NSObject, NSCopying, GKGameModel{
         currentPlayer = player
     }
     
+    /// Checks if it's currently player one's turn.
+    /// - Returns: True if player one is active, false otherwise
     func isPlayerOneTurn()->Bool{
-        return isPlayerOne(activePlayer!)
+        guard let player = activePlayer else {
+            return false
+        }
+        return isPlayerOne(player)
     }
     
+    /// Checks if it's currently player two's turn.
+    /// - Returns: True if player two is active, false otherwise
     func isPlayerTwoTurn()->Bool{
         return !isPlayerOneTurn()
     }
@@ -145,6 +154,7 @@ class Board: NSObject, NSCopying, GKGameModel{
         return currentPlayer
     }
     
+    /// Toggles the current player between player one and player two.
     func togglePlayer(){
         currentPlayer = currentPlayer?.playerId == _players[0].playerId ? _players[1] : _players[0]
     }
@@ -202,61 +212,52 @@ class Board: NSObject, NSCopying, GKGameModel{
         return false
     }
     
+    /// Calculates the heuristic score for a given player's position.
+    /// - Parameter player: The player to evaluate
+    /// - Returns: A static score based on the current board state
+    ///
+    /// Scoring heuristic:
+    /// - 4 points: Winning position (immediate win)
+    /// - 0 points: Losing position (opponent has won)
+    /// - 3 points: Blocking position (opponent is one move from winning)
+    /// - 2 points: Threatening position (player is one move from winning)
+    /// - 1 point: Default position (neutral move)
     func score(for player: GKGameModelPlayer) -> Int {
+        // Winning position: highest priority
         if isWin(for: player){
-            if isPlayerOne(player){
-                currentScoreForPlayerOne += 4
-                return currentScoreForPlayerOne
-            }
-            else{
-                currentScoreForPlayerTwo += 4
-                return currentScoreForPlayerTwo
-            }
+            return 4
         }
         
+        // Losing position: lowest score
         if isLoss(for: player){
             return 0
         }
         
         let opponent = isPlayerOne(player) ? playerTwo() : playerOne()
         
+        // Blocking opponent's win: second highest priority
         let opponentOneMoveAwayFromWinning = isOneMoveAwayFromWinning(opponent)
         if opponentOneMoveAwayFromWinning{
-            if isPlayerOne(player){
-                currentScoreForPlayerOne += 3
-                return currentScoreForPlayerOne
-            }
-            else{
-                currentScoreForPlayerTwo += 3
-                return currentScoreForPlayerTwo
-            }
+            return 3
         }
         
+        // Creating winning threat: third highest priority
         let playOneMoveAwayFromWinning = isOneMoveAwayFromWinning(player)
         if playOneMoveAwayFromWinning{
-            if isPlayerOne(player){
-                currentScoreForPlayerOne += 2
-                return currentScoreForPlayerOne
-            }
-            else{
-                currentScoreForPlayerTwo += 2
-                return currentScoreForPlayerTwo
-            }
+            return 2
         }
         
-        if isPlayerOne(player){
-            currentScoreForPlayerOne += 1
-            return currentScoreForPlayerOne
-        }
-        else{
-            currentScoreForPlayerTwo += 1
-            return currentScoreForPlayerTwo
-        }
+        // Default neutral position
+        return 1
     }
     
+    /// Checks if a player is one move away from winning.
+    /// - Parameter player: The player to check
+    /// - Returns: True if the player can win with one more move
     func isOneMoveAwayFromWinning(_ player: GKGameModelPlayer)->Bool {
         
-        let row_diagonal_Checker = {(row:ArraySlice<BoardCell>, playerCell: PlayerType)->Bool in
+        // Helper closure to check if a line has two of player's marks and one empty cell
+        let row_diagonal_Checker = {(row:[BoardCell], playerCell: PlayerType)->Bool in
             let numofPlayerTypes = row.filter{$0.value == playerCell}
             let containsBlankCells = row.filter{$0.value == .none}
         
@@ -270,116 +271,70 @@ class Board: NSObject, NSCopying, GKGameModel{
             return false
         }
         
-        // check the rows for two in a row
-        let row1 = board[0...2]
         let playerCell: PlayerType = isPlayerOne(player) ? .x : .o
-        let row2 = board[3...5]
-        let row3 = board[6...8]
         
-        if row_diagonal_Checker(row1,playerCell){
-            return true
-        }
+        // Define all lines to check (rows, columns, diagonals)
+        let linesToCheck: [[Int]] = [
+            // Rows
+            [0, 1, 2],
+            [3, 4, 5],
+            [6, 7, 8],
+            // Columns
+            [0, 3, 6],
+            [1, 4, 7],
+            [2, 5, 8],
+            // Diagonals
+            [0, 4, 8],
+            [2, 4, 6]
+        ]
         
-        if row_diagonal_Checker(row2, playerCell){
-            return true
-        }
-        
-        if row_diagonal_Checker(row3, playerCell){
-            return true
-        }
-        
-        var col1 = ArraySlice<BoardCell>()
-        col1.append(board[0])
-        col1.append(board[3])
-        col1.append(board[6])
-        
-        if row_diagonal_Checker(col1, playerCell){
-            return true
-        }
-        
-        var col2 = ArraySlice<BoardCell>()
-        col2.append(board[1])
-        col2.append(board[4])
-        col2.append(board[7])
-        
-        if row_diagonal_Checker(col2, playerCell){
-            return true
-        }
-        
-        var col3 = ArraySlice<BoardCell>()
-        col3.append(board[2])
-        col3.append(board[5])
-        col3.append(board[8])
-        
-        if row_diagonal_Checker(col3, playerCell){
-            return true
-        }
-        
-        var diag1 = ArraySlice<BoardCell>()
-        diag1.append(board[0])
-        diag1.append(board[4])
-        diag1.append(board[8])
-        
-        if row_diagonal_Checker(diag1, playerCell){
-            return true
-        }
-        
-        var diag2 = ArraySlice<BoardCell>()
-        diag2.append(board[2])
-        diag2.append(board[4])
-        diag2.append(board[6])
-        
-        if row_diagonal_Checker(diag2, playerCell){
-            return true
+        // Check each line
+        for lineIndices in linesToCheck {
+            let line = lineIndices.map { board[$0] }
+            if row_diagonal_Checker(line, playerCell) {
+                return true
+            }
         }
         
         return false
     }
     
+    /// Determines if there's a winner or if the game is in a draw/playing state.
+    /// - Returns: A tuple containing the game state and the winning player (if any)
     func determineIfWinner()->(GameState, GKGameModelPlayer?){
-        // check rows for a winner
-        if board[0].value != .none && (board[0].value == board[1].value && board[0].value == board[2].value){
-            guard let winner: GKGameModelPlayer = getPlayerAtBoardCell(board[0]) else{ return (.draw, nil)}
-            return (.winner, winner)
+        // Define all winning line combinations (indices in board array)
+        let winningLines: [[Int]] = [
+            // Rows
+            [0, 1, 2],
+            [3, 4, 5],
+            [6, 7, 8],
+            // Columns
+            [0, 3, 6],
+            [1, 4, 7],
+            [2, 5, 8],
+            // Diagonals
+            [0, 4, 8],
+            [2, 4, 6]
+        ]
+        
+        // Check each winning line
+        for line in winningLines {
+            let firstCell = board[line[0]]
+            let secondCell = board[line[1]]
+            let thirdCell = board[line[2]]
+            
+            // Check if all three cells have the same non-empty value
+            if firstCell.value != .none &&
+               firstCell.value == secondCell.value &&
+               firstCell.value == thirdCell.value {
+                guard let winner = getPlayerAtBoardCell(firstCell) else {
+                    return (.draw, nil)
+                }
+                return (.winner, winner)
+            }
         }
         
-        if board[3].value != .none && (board[3].value == board[4].value && board[3].value == board[5].value){
-            guard let winner: GKGameModelPlayer = getPlayerAtBoardCell(board[3]) else{ return (.draw, nil)}
-            return (.winner, winner)
-        }
-        
-        if board[6].value != .none && (board[6].value == board[7].value && board[6].value == board[8].value) {
-            guard let winner: GKGameModelPlayer = getPlayerAtBoardCell(board[6]) else{ return (.draw, nil)}
-            return (.winner, winner)
-        }
-        
-        // check columns for a winner
-        if board[0].value != .none && (board[0].value == board[3].value && board[3].value == board[6].value){
-            guard let winner: GKGameModelPlayer = getPlayerAtBoardCell(board[0]) else{ return (.draw, nil)}
-            return (.winner, winner)
-        }
-        
-        if board[1].value != .none && (board[1].value == board[4].value && board[4].value == board[7].value){
-            guard let winner: GKGameModelPlayer = getPlayerAtBoardCell(board[1]) else{ return (.draw, nil)}
-            return (.winner, winner)
-        }
-        
-        if board[2].value != .none && (board[2].value == board[5].value && board[5].value == board[8].value){
-            guard let winner: GKGameModelPlayer = getPlayerAtBoardCell(board[2]) else{ return (.draw, nil)}
-            return (.winner, winner)
-        }
-        
-        // check diagonals for a winner
-        if board[0].value != .none && (board[0].value == board[4].value && board[4].value == board[8].value){
-            guard let winner: GKGameModelPlayer = getPlayerAtBoardCell(board[0]) else{ return (.draw, nil)}
-            return (.winner, winner)
-        }
-        
-        if board[2].value != .none && (board[2].value == board[4].value && board[4].value == board[6].value){
-            guard let winner: GKGameModelPlayer = getPlayerAtBoardCell(board[2]) else{ return (.draw, nil)}
-            return (.winner, winner)
-        }
-        
+        // Check if board is full (draw condition)
         let foundEmptyCells: [BoardCell] = board.filter{ (gridCoord) -> Bool in
             return gridCoord.value == .none
         }
